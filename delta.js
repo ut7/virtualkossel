@@ -69,7 +69,7 @@ towerPositions.forEach(function (pos) {
 
   pushRods.push(push);
 
-  push.position.set(pos.x * 0.9, pos.y * 0.9, towerHeight / 2);
+  push.position.set(pos.x, pos.y, towerHeight / 2);
 
   scene.add(push);
 });
