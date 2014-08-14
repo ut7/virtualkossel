@@ -2,25 +2,39 @@ THREE.Object3D.DefaultUp = new THREE.Vector3(0, 0, 1);
 
 var scene = new THREE.Scene();
 
-//var renderer = new THREE.CanvasRenderer();
-var renderer = new THREE.WebGLRenderer();
+var renderer = new THREE.WebGLRenderer( { antialias: true } );
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-var partMaterial = new THREE.MeshLambertMaterial({color: 0x00ff00});
-var rodMaterial = new THREE.MeshLambertMaterial({color: 0xff0000});
-var bedMaterial = new THREE.MeshLambertMaterial({wireframe:false,color: 0xddddff});
+var partMaterial = new THREE.MeshLambertMaterial({color: 0x7777ff});
+var rodMaterial = new THREE.MeshPhongMaterial({color: 0x222222,
+  shininess: 100});
+var bedMaterial = new THREE.MeshPhongMaterial({
+  color: 0xffffff,
+  specular: 0xeeeeff,
+  shininess: 10,
+  transparent: true,
+  opacity: 0.8
+});
 var lineMaterial = new THREE.LineBasicMaterial({vertexColors:THREE.VertexColors});
+var metalMaterial = new THREE.MeshPhongMaterial( {
+  ambient: 0x030303,
+  color: 0xdddddd,
+  specular: 0x999999,
+  shininess: 30,
+  shading: THREE.SmoothShading
+} );
 
 var towerRadius = 8;
 var towerHeight = 600;
 var pushRodRadius = 3;
 var pushRodLength = 214;
-var rodSeparation = 22;
+var rodSeparation = 23;
 var effectorOffset = 20;
 
 var bedRadius = 85;
-var bedThickness = 15;
+var bedThickness = 4;
+var bedHeight = 40;
 
 var towerDistance = 100;
 
@@ -60,25 +74,28 @@ var towerPositions = towerDirections.map(function (dir) {
   return dir.clone().multiplyScalar(towerDistance);
 });
 
-towerDirections.forEach(function (dir, i) {
-  var aTower = new THREE.Mesh(towerGeometry, partMaterial);
-
-  aTower.position.set(dir.x, dir.y, 0).multiplyScalar(towerDistance + effectorOffset + 10);
-  aTower.rotation.z = towerAngles[i];
-  scene.add(aTower);
-});
-
-scene.add(function() {
+var bed = function() {
   var geometry = zCylinderGeometry(bedRadius, bedThickness, 32);
   var bed = new THREE.Mesh(geometry, bedMaterial);
   bed.position.z = -bedThickness;
   return bed;
-}());
+}();
+
+scene.add(bed);
+
+var rodEnd = new THREE.Mesh(
+  new THREE.SphereGeometry(pushRodRadius * 1.2, 16, 16),
+  metalMaterial
+);
 
 function pushRod() {
-  return new THREE.Mesh(
+  var rod = new THREE.Object3D();
+  rod.add(new THREE.Mesh(
     zCylinderGeometry(pushRodRadius, pushRodLength),
-    rodMaterial);
+    rodMaterial));
+  rod.add(rodEnd.clone());
+  rod.add(function(end) { end.position.z = pushRodLength; return end; }(rodEnd.clone()));
+  return rod;
 }
 
 var pushRods = towerDirections.map(function (dir) {
@@ -97,9 +114,10 @@ var carriages = towerDirections.map(function (dir, i) {
   var carriage = new THREE.Object3D();
   carriage.position.set(dir.x, dir.y, 0).multiplyScalar(towerDistance + effectorOffset);
   carriage.rotation.z = towerAngles[i];
-  scene.add(carriage);
   return carriage;
 });
+
+scene.add.apply(scene, carriages);
 
 var light = new THREE.PointLight( 0xffffff );
 light.position.set( 500, -500, 500 );
@@ -109,11 +127,11 @@ scene.add( new THREE.AmbientLight( 0x404040 ) );
 
 var camera = new THREE.PerspectiveCamera(75,
                                          window.innerWidth/window.innerHeight,
-                                         1, 2000);
+                                         10, 2000);
 
 camera.position.x = 201;
 camera.position.y = -201;
-camera.position.z = 400;
+camera.position.z = 200;
 
 var controls = new THREE.TrackballControls( camera, renderer.domElement );
 
@@ -127,11 +145,11 @@ controls.noPan = false;
 controls.staticMoving = true;
 controls.dynamicDampingFactor = 0.3;
 
-controls.target.set(0, 0, 0);
+controls.target.set(0, 0, 70);
 
 var time = 0;
 
-var headHeight = 30;
+var headHeight = 50;
 
 function makeHead() {
   return new THREE.Object3D().add(
@@ -249,82 +267,64 @@ var render = function () {
   time += 0.1;
 };
 
-render();
-
 function loadGcode(path) {
   var loader = new THREE.XHRLoader();
   loader.load(path, function (text) {
     gcodeLines = text.split('\n');
     console.log("loaded " + gcodeLines.length + " lines");
+    render();
   });
 }
+
+loadGcode('eiffel.gcode');
 
 function loadStl(name, fn) {
   var loader = new THREE.STLLoader();
   loader.addEventListener( 'load', function ( event ) {
       var geometry = event.content;
-      fn(new THREE.Mesh( geometry, partMaterial ) );
+      fn(geometry);
   } );
   loader.load( 'kossel/' + name + '.stl' );
 }
 
-loadStl('effector', function(obj) {
-  obj.geometry.applyMatrix(new THREE.Matrix4()
-    .makeRotationFromEuler(new THREE.Euler(0, 0, Math.PI / 2))
-    .setPosition(new THREE.Vector3(0, 0, -5))
+loadStl('effector', function(geometry) {
+  geometry.computeBoundingBox();
+  console.log(geometry.boundingBox.center());
+  geometry.applyMatrix(new THREE.Matrix4()
+    .makeRotationFromEuler(new THREE.Euler(Math.PI, 0, Math.PI / 2))
+    .setPosition(new THREE.Vector3(0, 0, geometry.boundingBox.center().z))
   );
 
-  var newHead = new THREE.Object3D();
+  var obj = new THREE.Mesh(geometry, partMaterial);
 
   head.add( obj );
 });
 
-loadStl('carriage', function(obj) {
-  obj.geometry.applyMatrix(new THREE.Matrix4()
+loadStl('carriage', function(geometry) {
+  geometry.applyMatrix(new THREE.Matrix4()
     .makeRotationFromEuler(new THREE.Euler(Math.PI / 2, 0, -Math.PI / 2, 'ZXY'))
     .setPosition(new THREE.Vector3(7, 0, -16))
   );
+
   carriages.forEach(function (carriage) {
-    carriage.add(obj.clone());
+    carriage.add(new THREE.Mesh(geometry, partMaterial));
   });
 });
 
-loadGcode('eiffel.gcode');
+loadStl('openbeam', function(geometry) {
+  geometry.applyMatrix(new THREE.Matrix4()
+                       .scale(new THREE.Vector3(1, 1, towerHeight)));
 
-function loadDxf(path) {
-  var loader = new THREE.XHRLoader();
-  loader.load(path, function (text) {
-    var dxfLines = text.split('\n');
-    console.log("loaded " + dxfLines.length + " lines");
-    var evenLine = true;
-    var line1, line2;
-    var currentSegment;
-    var points = [];
-    dxfLines.forEach(function (line) {
-      if(evenLine) line1 = line;
-      else {
-        line2 = line;
+  var towers = towerDirections.map(function (dir, i) {
+    var tower = new THREE.Mesh(geometry, metalMaterial);
 
-        switch(line1.trim()) {
-          case '0':
-            if(currentSegment && currentSegment[10]) {
-              if(points.length == 0) {
-                points.push({ x: currentSegment[10], y: currentSegment[20] });
-              }
-              points.push({ x: currentSegment[11], y: currentSegment[21] });
-            }
-            currentSegment = {};
-            break;
-          default:
-            currentSegment[line1.trim()] = parseFloat(line2);
-        }
-      }
+    tower.position.set(dir.x, dir.y, 0)
+      .multiplyScalar(towerDistance + effectorOffset + 15)
+      .setZ(-bedHeight);
+    tower.rotation.z = towerAngles[i];
 
-      evenLine = !evenLine;
-    });
-    console.log(points);
+    return tower;
   });
-}
 
-loadDxf('openbeam.dxf');
-
+  scene.add.apply(scene, towers);
+});
