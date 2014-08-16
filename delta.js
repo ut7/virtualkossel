@@ -3,10 +3,14 @@ THREE.Object3D.DefaultUp = new THREE.Vector3(0, 0, 1);
 var scene = new THREE.Scene();
 
 var renderer = new THREE.WebGLRenderer( { antialias: true } );
+renderer.setClearColor(0xffffff);
 renderer.setSize(window.innerWidth, window.innerHeight);
 document.body.appendChild(renderer.domElement);
 
-var partMaterial = new THREE.MeshLambertMaterial({color: 0x7777ff});
+var partMaterial = new THREE.MeshLambertMaterial({color: 0x7777ff,
+  transparent: true,
+  opacity: 0.9
+});
 var rodMaterial = new THREE.MeshPhongMaterial({color: 0x222222,
   shininess: 100});
 var bedMaterial = new THREE.MeshPhongMaterial({
@@ -34,9 +38,9 @@ var effectorOffset = 20;
 
 var bedRadius = 85;
 var bedThickness = 4;
-var bedHeight = 40;
+var bedHeight = 50;
 
-var towerDistance = 100;
+var towerDistance = 116;
 
 function zCylinderGeometry(radius, length, facets) {
   var geometry = new THREE.CylinderGeometry(radius, radius, length, facets || 8);
@@ -75,7 +79,7 @@ var towerPositions = towerDirections.map(function (dir) {
 });
 
 var bed = function() {
-  var geometry = zCylinderGeometry(bedRadius, bedThickness, 32);
+  var geometry = zCylinderGeometry(bedRadius, bedThickness, 64);
   var bed = new THREE.Mesh(geometry, bedMaterial);
   bed.position.z = -bedThickness;
   return bed;
@@ -129,9 +133,9 @@ var camera = new THREE.PerspectiveCamera(75,
                                          window.innerWidth/window.innerHeight,
                                          10, 2000);
 
-camera.position.x = 201;
-camera.position.y = -201;
-camera.position.z = 200;
+camera.position.x = 150;
+camera.position.y = -150;
+camera.position.z = 400;
 
 var controls = new THREE.TrackballControls( camera, renderer.domElement );
 
@@ -145,7 +149,8 @@ controls.noPan = false;
 controls.staticMoving = true;
 controls.dynamicDampingFactor = 0.3;
 
-controls.target.set(0, 0, 70);
+controls.target.set(0, 0, 50);
+//controls.target.set(towerPositions[0].x, towerPositions[0].y, 0);
 
 var time = 0;
 
@@ -311,20 +316,54 @@ loadStl('carriage', function(geometry) {
   });
 });
 
-loadStl('openbeam', function(geometry) {
-  geometry.applyMatrix(new THREE.Matrix4()
-                       .scale(new THREE.Vector3(1, 1, towerHeight)));
+loadStl('frame_top', function(topVertexGeometry) {
+  loadStl('frame_motor', function(bottomVertexGeometry) {
+    loadStl('openbeam', function(beamGeometry) {
+      var towers = towerDirections.map(function (dir, i) {
+        var tower = new THREE.Object3D();
 
-  var towers = towerDirections.map(function (dir, i) {
-    var tower = new THREE.Mesh(geometry, metalMaterial);
+        var verticalBeam = new THREE.Mesh(beamGeometry, metalMaterial);
+        verticalBeam.scale.z = towerHeight;
 
-    tower.position.set(dir.x, dir.y, 0)
-      .multiplyScalar(towerDistance + effectorOffset + 15)
-      .setZ(-bedHeight);
-    tower.rotation.z = towerAngles[i];
+        var horizontalBeams = new THREE.Object3D();
+        horizontalBeams.position.x = 19.5;
+        horizontalBeams.position.y = 1.5;
 
-    return tower;
+        var horizontalBeam = new THREE.Mesh(beamGeometry, metalMaterial);
+        horizontalBeam.scale.z = 240;
+        horizontalBeam.rotation.set(Math.PI / 2, 0, 5 * Math.PI / 6, 'ZXY');
+
+        horizontalBeam.position.z = 7.5;
+
+        var horizontalBeam2 = horizontalBeam.clone();
+        horizontalBeam2.position.z = 37.5;
+
+        var horizontalBeam3 = horizontalBeam.clone();
+        horizontalBeam3.position.z = towerHeight - 7.5;
+
+        horizontalBeams.add(horizontalBeam);
+        horizontalBeams.add(horizontalBeam2);
+        horizontalBeams.add(horizontalBeam3);
+
+        var bottomVertex = new THREE.Mesh(bottomVertexGeometry, partMaterial);
+
+        var topVertex = new THREE.Mesh(topVertexGeometry, partMaterial);
+        topVertex.position.z = towerHeight - 15;
+
+        tower.add(verticalBeam);
+        tower.add(bottomVertex);
+        tower.add(topVertex);
+        tower.add(horizontalBeams);
+
+        tower.rotation.z = towerAngles[i] + Math.PI / 2;
+        tower.position.set(dir.x, dir.y, 0)
+          .multiplyScalar(towerDistance + effectorOffset + 15)
+          .setZ(-bedHeight);
+
+        return tower;
+      });
+
+      scene.add.apply(scene, towers);
+    });
   });
-
-  scene.add.apply(scene, towers);
 });
