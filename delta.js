@@ -263,7 +263,7 @@ function moveCarriages() {
 var render = function () {
   requestAnimationFrame(render);
 
-  for(var i=0;i<1;i++)
+  for(var i=0;i<5;i++)
     moveCarriages();
 
   renderer.render(scene, camera);
@@ -281,7 +281,7 @@ function loadGcode(path) {
   });
 }
 
-loadGcode('eiffel.gcode');
+loadGcode('logo_ut7.gcode');
 
 function loadStl(name, fn) {
   var loader = new THREE.STLLoader();
