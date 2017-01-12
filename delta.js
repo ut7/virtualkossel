@@ -192,8 +192,8 @@ var cartesianTarget = new THREE.Vector3();
 function splitGcode(gcodeLine) {
   var result = {};
 
-  gcodeLine.replace(/([A-Z])([-0-9.]+)/g, function() {
-    result[RegExp.$1] = parseFloat(RegExp.$2);
+  gcodeLine.replace(/([A-Z])([-0-9.]+)/g, function(lettervalue, letter, value) {
+    result[letter] = parseFloat(value);
     return '';
   });
 
