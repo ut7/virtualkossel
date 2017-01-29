@@ -22,7 +22,6 @@ var bedMaterial = new THREE.MeshPhongMaterial({
 });
 var lineMaterial = new THREE.LineBasicMaterial({vertexColors:THREE.VertexColors});
 var metalMaterial = new THREE.MeshPhongMaterial( {
-  ambient: 0x030303,
   color: 0xdddddd,
   specular: 0x999999,
   shininess: 30,
@@ -50,19 +49,6 @@ function zCylinderGeometry(radius, length, facets) {
     .setPosition(new THREE.Vector3(0, 0, length / 2))
   );
 
-  return geometry;
-}
-
-var towerGeometry = createTowerGeometry();
-
-function createTowerGeometry() {
-  var path = new THREE.Shape([
-    { x: 8, y: 8 },
-    { x: 8, y: -8 },
-    { x: -8, y: -8 },
-    { x: -8, y: 8 },
-  ]);
-  var geometry = path.extrude({amount: towerHeight, bevelEnabled: false});
   return geometry;
 }
 
@@ -127,7 +113,7 @@ var light = new THREE.PointLight( 0xffffff );
 light.position.set( 500, -500, 500 );
 scene.add( light );
 
-scene.add( new THREE.AmbientLight( 0x404040 ) );
+scene.add( new THREE.AmbientLight( 0x101010 ) );
 
 var camera = new THREE.PerspectiveCamera(75,
                                          window.innerWidth/window.innerHeight,
@@ -135,35 +121,33 @@ var camera = new THREE.PerspectiveCamera(75,
 
 camera.position.x = 150;
 camera.position.y = -150;
-camera.position.z = 400;
+camera.position.z = 200;
 
-var controls = new THREE.TrackballControls( camera, renderer.domElement );
+var controls = new THREE.OrbitControls( camera, renderer.domElement );
 
+controls.enableZoom = true;
+controls.zoomSpeed = 1.0;
+
+controls.enableRotate = true;
 controls.rotateSpeed = 1.0;
-controls.zoomSpeed = 1.2;
-controls.panSpeed = 0.8;
 
-controls.noZoom = false;
-controls.noPan = false;
+controls.enablePan = true;
+controls.keyPanSpeed = 7.0;
 
-controls.staticMoving = true;
-controls.dynamicDampingFactor = 0.3;
+//controls.autoRotate = true;
+controls.autoRotateSpeed = 1.0;
+
+controls.enableDamping = true;
+controls.dampingFactor = 0.25;
 
 controls.target.set(0, 0, 50);
-//controls.target.set(towerPositions[0].x, towerPositions[0].y, 0);
 
 var time = 0;
 
-var headHeight = 50;
+var headHeight = 62;
+var hotendZOffset = 5;
 
-function makeHead() {
-  return new THREE.Object3D().add(
-    new THREE.ArrowHelper(new THREE.Vector3(0, 0, -1),
-                          new THREE.Vector3(0,0,0),
-                          headHeight));
-}
-
-var head = makeHead();
+var head = new THREE.Object3D();
 scene.add(head);
 
 var line = new IncrementalLine(1000000, lineMaterial);
@@ -273,7 +257,7 @@ var render = function () {
 };
 
 function loadGcode(path) {
-  var loader = new THREE.XHRLoader();
+  var loader = new THREE.FileLoader();
   loader.load(path, function (text) {
     gcodeLines = text.split('\n');
     console.log("loaded " + gcodeLines.length + " lines");
@@ -285,24 +269,31 @@ loadGcode('logo_ut7.gcode');
 
 function loadStl(name, fn) {
   var loader = new THREE.STLLoader();
-  loader.addEventListener( 'load', function ( event ) {
-      var geometry = event.content;
-      fn(geometry);
-  } );
-  loader.load( 'kossel/' + name + '.stl' );
+  loader.load( 'kossel/' + name + '.stl', fn);
 }
 
-loadStl('effector', function(geometry) {
-  geometry.computeBoundingBox();
-  console.log(geometry.boundingBox.center());
-  geometry.applyMatrix(new THREE.Matrix4()
+loadStl('effector', function(effectorGeometry) {
+  effectorGeometry.computeBoundingBox();
+  effectorGeometry.applyMatrix(new THREE.Matrix4()
     .makeRotationFromEuler(new THREE.Euler(Math.PI, 0, Math.PI / 2))
-    .setPosition(new THREE.Vector3(0, 0, geometry.boundingBox.center().z))
+    .setPosition(new THREE.Vector3(0, 0, effectorGeometry.boundingBox.getCenter().z))
   );
 
-  var obj = new THREE.Mesh(geometry, partMaterial);
+  var effector = new THREE.Mesh(effectorGeometry, partMaterial);
 
-  head.add( obj );
+  head.add(effector);
+});
+
+loadStl('E3D_V6_1.75mm_Universal_HotEnd_Mockup', function(hotendGeometry) {
+  hotendGeometry.computeBoundingBox();
+  hotendGeometry.applyMatrix(new THREE.Matrix4()
+    .makeRotationFromEuler(new THREE.Euler(Math.PI/2, 0, 0))
+    .setPosition(new THREE.Vector3(0, 0, hotendGeometry.boundingBox.min.x - hotendZOffset))
+  );
+
+  var hotend = new THREE.Mesh(hotendGeometry, metalMaterial);
+
+  head.add(hotend);
 });
 
 loadStl('carriage', function(geometry) {

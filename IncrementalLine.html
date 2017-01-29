@@ -8,6 +8,7 @@ canvas { width: 100%; height: 100% }
 </head>
 <body>
 <script src="three.js"></script>
+<script src="OrbitControls.js"></script>
 <script src="IncrementalLine.js"></script>
 <script>
 var scene = new THREE.Scene();
@@ -34,6 +35,8 @@ camera.position.y = -400;
 camera.position.z = 400;
 
 camera.lookAt(new THREE.Vector3(0, 0, 0));
+
+var controls = new THREE.OrbitControls(camera, renderer.domElement);
 
 var time = 0;
 
