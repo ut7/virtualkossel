@@ -238,7 +238,7 @@ function moveCarriages() {
       rod.other.rotation.copy(orienter.rotation);
     });
 
-    line.addVertex(headPos.x, headPos.y, headPos.z - headHeight, codes.E);
+    line.addVertex(headPos.x, headPos.y, headPos.z - headHeight, codes.E > 0);
   }
   
   currentGcodeLine++;
